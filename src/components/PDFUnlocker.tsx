@@ -57,6 +57,9 @@ export const PDFUnlocker = () => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       
+      // Create a copy of the buffer for pdf-lib since pdfjs will detach the original
+      const arrayBufferCopy = arrayBuffer.slice(0);
+      
       // Use PDF.js to verify password and get decrypted content
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
@@ -65,15 +68,14 @@ export const PDFUnlocker = () => {
       
       const pdfDoc = await loadingTask.promise;
       
-      // Get number of pages
+      // Get number of pages (validates the password worked)
       const numPages = pdfDoc.numPages;
       
       // Create a new unencrypted PDF using pdf-lib
       const newPdfDoc = await PDFDocument.create();
       
-      // We need to copy the original PDF without encryption
-      // Since pdf-lib can load with ignoreEncryption after pdfjs verified the password
-      const originalPdf = await PDFDocument.load(arrayBuffer, {
+      // Use the copy of the buffer since the original was detached by pdfjs
+      const originalPdf = await PDFDocument.load(arrayBufferCopy, {
         ignoreEncryption: true,
       });
       
