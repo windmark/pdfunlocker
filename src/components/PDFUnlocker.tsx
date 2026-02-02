@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist';
 import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from 'lucide-react';
 
-// Set up the worker using legacy build
-GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
+// Set up the worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 type Status = 'idle' | 'loading' | 'unlocked' | 'error';
 
@@ -58,7 +58,7 @@ export const PDFUnlocker = () => {
       const arrayBuffer = await file.arrayBuffer();
       
       // Use PDF.js to verify password and get decrypted content
-      const loadingTask = getDocument({
+      const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         password: password,
       });
