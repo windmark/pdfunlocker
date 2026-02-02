@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
 import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from 'lucide-react';
+
+// Set up the worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 type Status = 'idle' | 'loading' | 'unlocked' | 'error';
 
@@ -52,21 +56,52 @@ export const PDFUnlocker = () => {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-        password,
-        ignoreEncryption: false 
-      } as { password: string; ignoreEncryption: boolean });
-      const unlockedBytes = await pdfDoc.save();
+      
+      // Use PDF.js to verify password and get decrypted content
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        password: password,
+      });
+      
+      const pdfDoc = await loadingTask.promise;
+      
+      // Get number of pages
+      const numPages = pdfDoc.numPages;
+      
+      // Create a new unencrypted PDF using pdf-lib
+      const newPdfDoc = await PDFDocument.create();
+      
+      // We need to copy the original PDF without encryption
+      // Since pdf-lib can load with ignoreEncryption after pdfjs verified the password
+      const originalPdf = await PDFDocument.load(arrayBuffer, {
+        ignoreEncryption: true,
+      });
+      
+      // Copy all pages
+      const pages = await newPdfDoc.copyPages(originalPdf, originalPdf.getPageIndices());
+      pages.forEach((page) => newPdfDoc.addPage(page));
+      
+      // Save without encryption
+      const unlockedBytes = await newPdfDoc.save();
       setUnlockedPdf(unlockedBytes);
       setStatus('unlocked');
+      
+      // Clean up
+      pdfDoc.destroy();
     } catch (error) {
+      console.error('PDF unlock error:', error);
       setStatus('error');
       if (error instanceof Error) {
-        if (error.message.includes('password')) {
-          setErrorMessage('Incorrect password');
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('incorrect password') || errorMsg.includes('password')) {
+          setErrorMessage('Incorrect password. Please try again.');
+        } else if (errorMsg.includes('encrypted')) {
+          setErrorMessage('This PDF uses unsupported encryption.');
         } else {
-          setErrorMessage('Failed to unlock PDF');
+          setErrorMessage('Failed to unlock PDF. Please check the password.');
         }
+      } else {
+        setErrorMessage('An unexpected error occurred.');
       }
     }
   };
