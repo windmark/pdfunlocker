@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
-import * as mupdf from 'mupdf';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
 import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from 'lucide-react';
+
+// Set up the worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 type Status = 'idle' | 'loading' | 'unlocked' | 'error';
 
@@ -52,35 +56,57 @@ export const PDFUnlocker = () => {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const data = new Uint8Array(arrayBuffer);
       
-      // Open the document with mupdf
-      const doc = mupdf.Document.openDocument(data, 'application/pdf');
+      // Use PDF.js to decrypt and render the PDF
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        password: password,
+      });
       
-      // Check if password is needed
-      if (doc.needsPassword()) {
-        // Authenticate with the password
-        const authResult = doc.authenticatePassword(password);
+      const pdfDoc = await loadingTask.promise;
+      const numPages = pdfDoc.numPages;
+      
+      // Create a new PDF using pdf-lib
+      const newPdfDoc = await PDFDocument.create();
+      
+      // Render each page and add to new PDF
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 2 }); // Higher scale for better quality
         
-        if (authResult === 0) {
-          // Password failed
-          throw new Error('Incorrect password');
-        }
+        // Create canvas and render page
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        await page.render({
+          canvasContext: context!,
+          viewport: viewport,
+        }).promise;
+        
+        // Convert canvas to JPEG (smaller file size than PNG)
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
+        
+        // Embed image in new PDF
+        const image = await newPdfDoc.embedJpg(imageBytes);
+        const newPage = newPdfDoc.addPage([image.width, image.height]);
+        newPage.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: image.width,
+          height: image.height,
+        });
       }
       
-      // Get the PDF-specific document for saving
-      const pdfDoc = doc.asPDF();
-      if (!pdfDoc) {
-        throw new Error('Not a valid PDF document');
-      }
-      
-      // Save the document without encryption
-      // The 'compress' option keeps file size small, no encryption options = no encryption
-      const buffer = pdfDoc.saveToBuffer('compress');
-      const unlockedBytes = new Uint8Array(buffer.asUint8Array());
-      
+      // Save the new PDF
+      const unlockedBytes = await newPdfDoc.save();
       setUnlockedPdf(unlockedBytes);
       setStatus('unlocked');
+      
+      // Clean up
+      pdfDoc.destroy();
       
     } catch (error) {
       console.error('PDF unlock error:', error);
@@ -279,7 +305,7 @@ export const PDFUnlocker = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-12">
-          Your files never leave your browser
+          Your files never leave your browser • Output is image-based
         </p>
       </div>
     </div>
