@@ -57,33 +57,50 @@ export const PDFUnlocker = () => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       
-      // Create a copy of the buffer for pdf-lib since pdfjs will detach the original
-      const arrayBufferCopy = arrayBuffer.slice(0);
-      
-      // Use PDF.js to verify password and get decrypted content
+      // Use PDF.js to decrypt and render the PDF
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         password: password,
       });
       
       const pdfDoc = await loadingTask.promise;
-      
-      // Get number of pages (validates the password worked)
       const numPages = pdfDoc.numPages;
       
-      // Create a new unencrypted PDF using pdf-lib
+      // Create a new PDF using pdf-lib
       const newPdfDoc = await PDFDocument.create();
       
-      // Use the copy of the buffer since the original was detached by pdfjs
-      const originalPdf = await PDFDocument.load(arrayBufferCopy, {
-        ignoreEncryption: true,
-      });
+      // Render each page and add to new PDF
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 2 }); // Higher scale for better quality
+        
+        // Create canvas and render page
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        await page.render({
+          canvasContext: context!,
+          viewport: viewport,
+        }).promise;
+        
+        // Convert canvas to JPEG (smaller file size than PNG)
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
+        
+        // Embed image in new PDF
+        const image = await newPdfDoc.embedJpg(imageBytes);
+        const newPage = newPdfDoc.addPage([image.width, image.height]);
+        newPage.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: image.width,
+          height: image.height,
+        });
+      }
       
-      // Copy all pages
-      const pages = await newPdfDoc.copyPages(originalPdf, originalPdf.getPageIndices());
-      pages.forEach((page) => newPdfDoc.addPage(page));
-      
-      // Save without encryption
+      // Save the new PDF
       const unlockedBytes = await newPdfDoc.save();
       setUnlockedPdf(unlockedBytes);
       setStatus('unlocked');
