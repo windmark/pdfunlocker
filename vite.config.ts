@@ -13,14 +13,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    target: 'esnext',
+    target: "esnext",
   },
   optimizeDeps: {
     esbuildOptions: {
-      target: 'esnext',
+      target: "esnext",
     },
+    // Exclude mupdf from optimization - it needs to be loaded by the worker
+    exclude: ["mupdf"],
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  worker: {
+    format: "es",
+  },
+  plugins: [react(), mode === "development" && componentTagger()].filter(
+    Boolean
+  ),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

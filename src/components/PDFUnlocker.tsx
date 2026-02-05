@@ -1,20 +1,18 @@
-import { useState, useCallback } from 'react';
-import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from 'lucide-react';
+import { useState, useCallback } from "react";
+import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from "lucide-react";
+import { useMupdfWorker } from "@/hooks/useMupdfWorker";
 
-// Set up the worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-
-type Status = 'idle' | 'loading' | 'unlocked' | 'error';
+type Status = "idle" | "loading" | "unlocked" | "error";
 
 export const PDFUnlocker = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [unlockedPdf, setUnlockedPdf] = useState<Uint8Array | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const { decrypt, isReady } = useMupdfWorker();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -30,98 +28,49 @@ export const PDFUnlocker = () => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.type === 'application/pdf') {
+    if (droppedFile?.type === "application/pdf") {
       setFile(droppedFile);
-      setStatus('idle');
-      setErrorMessage('');
+      setStatus("idle");
+      setErrorMessage("");
       setUnlockedPdf(null);
     }
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setStatus('idle');
-      setErrorMessage('');
-      setUnlockedPdf(null);
-    }
-  }, []);
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFile = e.target.files?.[0];
+      if (selectedFile) {
+        setFile(selectedFile);
+        setStatus("idle");
+        setErrorMessage("");
+        setUnlockedPdf(null);
+      }
+    },
+    []
+  );
 
   const handleUnlock = async () => {
     if (!file || !password) return;
 
-    setStatus('loading');
-    setErrorMessage('');
+    setStatus("loading");
+    setErrorMessage("");
 
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Use PDF.js to decrypt and render the PDF
-      const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer,
-        password: password,
-      });
-      
-      const pdfDoc = await loadingTask.promise;
-      const numPages = pdfDoc.numPages;
-      
-      // Create a new PDF using pdf-lib
-      const newPdfDoc = await PDFDocument.create();
-      
-      // Render each page and add to new PDF
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: 2 }); // Higher scale for better quality
-        
-        // Create canvas and render page
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        
-        await page.render({
-          canvasContext: context!,
-          viewport: viewport,
-        }).promise;
-        
-        // Convert canvas to JPEG (smaller file size than PNG)
-        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-        const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
-        
-        // Embed image in new PDF
-        const image = await newPdfDoc.embedJpg(imageBytes);
-        const newPage = newPdfDoc.addPage([image.width, image.height]);
-        newPage.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: image.width,
-          height: image.height,
-        });
-      }
-      
-      // Save the new PDF
-      const unlockedBytes = await newPdfDoc.save();
-      setUnlockedPdf(unlockedBytes);
-      setStatus('unlocked');
-      
-      // Clean up
-      pdfDoc.destroy();
-      
-    } catch (error) {
-      console.error('PDF unlock error:', error);
-      setStatus('error');
-      if (error instanceof Error) {
-        const errorMsg = error.message.toLowerCase();
-        if (errorMsg.includes('incorrect password') || errorMsg.includes('password')) {
-          setErrorMessage('Incorrect password. Please try again.');
-        } else if (errorMsg.includes('encrypted')) {
-          setErrorMessage('This PDF uses unsupported encryption.');
-        } else {
-          setErrorMessage('Failed to unlock PDF. Please check the password.');
-        }
+    const result = await decrypt(file, password);
+
+    if (result.success && result.data) {
+      setUnlockedPdf(result.data);
+      setStatus("unlocked");
+    } else {
+      setStatus("error");
+      const errorMsg = result.error?.toLowerCase() || "";
+      if (errorMsg.includes("incorrect password") || errorMsg.includes("password")) {
+        setErrorMessage("Incorrect password. Please try again.");
+      } else if (errorMsg.includes("encrypted")) {
+        setErrorMessage("This PDF uses unsupported encryption.");
+      } else if (errorMsg.includes("worker")) {
+        setErrorMessage("PDF processor is loading. Please try again.");
       } else {
-        setErrorMessage('An unexpected error occurred.');
+        setErrorMessage(result.error || "Failed to unlock PDF.");
       }
     }
   };
@@ -129,13 +78,12 @@ export const PDFUnlocker = () => {
   const handleDownload = () => {
     if (!unlockedPdf || !file) return;
 
-    // Create a copy to ensure we have a standard ArrayBuffer
     const pdfBytes = new Uint8Array(unlockedPdf).buffer;
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = file.name.replace('.pdf', '_unlocked.pdf');
+    a.download = file.name.replace(".pdf", "_unlocked.pdf");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -144,9 +92,9 @@ export const PDFUnlocker = () => {
 
   const handleReset = () => {
     setFile(null);
-    setPassword('');
-    setStatus('idle');
-    setErrorMessage('');
+    setPassword("");
+    setStatus("idle");
+    setErrorMessage("");
     setUnlockedPdf(null);
   };
 
@@ -156,7 +104,7 @@ export const PDFUnlocker = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-secondary mb-6">
-            {status === 'unlocked' ? (
+            {status === "unlocked" ? (
               <Unlock className="w-8 h-8 text-primary" />
             ) : (
               <Lock className="w-8 h-8 text-muted-foreground" />
@@ -179,9 +127,10 @@ export const PDFUnlocker = () => {
             className={`
               block w-full p-12 rounded-2xl border-2 border-dashed cursor-pointer
               transition-all duration-200 ease-out
-              ${isDragging 
-                ? 'border-primary bg-primary/5 scale-[1.02]' 
-                : 'border-border hover:border-muted-foreground hover:bg-secondary/50'
+              ${
+                isDragging
+                  ? "border-primary bg-primary/5 scale-[1.02]"
+                  : "border-border hover:border-muted-foreground hover:bg-secondary/50"
               }
             `}
           >
@@ -192,13 +141,15 @@ export const PDFUnlocker = () => {
               className="hidden"
             />
             <div className="flex flex-col items-center text-center">
-              <Upload className={`w-10 h-10 mb-4 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+              <Upload
+                className={`w-10 h-10 mb-4 transition-colors ${
+                  isDragging ? "text-primary" : "text-muted-foreground"
+                }`}
+              />
               <p className="text-foreground font-medium mb-1">
                 Drop your PDF here
               </p>
-              <p className="text-sm text-muted-foreground">
-                or click to browse
-              </p>
+              <p className="text-sm text-muted-foreground">or click to browse</p>
             </div>
           </label>
         ) : (
@@ -223,7 +174,7 @@ export const PDFUnlocker = () => {
               </button>
             </div>
 
-            {status !== 'unlocked' && (
+            {status !== "unlocked" && (
               <>
                 {/* Password Input */}
                 <div className="relative mb-4">
@@ -236,14 +187,14 @@ export const PDFUnlocker = () => {
                       w-full px-4 py-4 rounded-xl bg-secondary border-2
                       text-foreground placeholder:text-muted-foreground
                       focus:outline-none focus:border-primary transition-colors
-                      ${status === 'error' ? 'border-destructive' : 'border-transparent'}
+                      ${status === "error" ? "border-destructive" : "border-transparent"}
                     `}
-                    onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                    onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
                   />
                 </div>
 
                 {/* Error Message */}
-                {status === 'error' && (
+                {status === "error" && (
                   <p className="text-destructive text-sm mb-4 animate-fade-in">
                     {errorMessage}
                   </p>
@@ -252,20 +203,26 @@ export const PDFUnlocker = () => {
                 {/* Unlock Button */}
                 <button
                   onClick={handleUnlock}
-                  disabled={!password || status === 'loading'}
+                  disabled={!password || status === "loading" || !isReady}
                   className={`
                     w-full py-4 rounded-xl font-medium transition-all duration-200
                     flex items-center justify-center gap-2
-                    ${password 
-                      ? 'bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]' 
-                      : 'bg-secondary text-muted-foreground cursor-not-allowed'
+                    ${
+                      password && isReady
+                        ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                        : "bg-secondary text-muted-foreground cursor-not-allowed"
                     }
                   `}
                 >
-                  {status === 'loading' ? (
+                  {status === "loading" ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
                       Unlocking...
+                    </>
+                  ) : !isReady ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Loading processor...
                     </>
                   ) : (
                     <>
@@ -278,7 +235,7 @@ export const PDFUnlocker = () => {
             )}
 
             {/* Success State */}
-            {status === 'unlocked' && (
+            {status === "unlocked" && (
               <div className="animate-fade-in">
                 <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 mb-4">
                   <p className="text-primary text-center font-medium">
@@ -305,7 +262,7 @@ export const PDFUnlocker = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-12">
-          Your files never leave your browser • Output is image-based
+          Your files never leave your browser • Native PDF decryption
         </p>
       </div>
     </div>
