@@ -68,9 +68,10 @@ async function decryptPDF(
     throw new Error("Not a valid PDF document");
   }
 
-  // Save the document without encryption
-  // The 'compress' option keeps file size small, no encryption options = no encryption
-  const buffer = pdfDoc.saveToBuffer("compress");
+  // Save the document without encryption using the 'decrypt' option
+  // This explicitly removes password protection from the PDF
+  // Also use 'garbage=deduplicate' to clean up and reduce file size
+  const buffer = pdfDoc.saveToBuffer("decrypt,garbage=deduplicate,compress");
   const unlockedBytes = buffer.asUint8Array();
 
   // Create a copy since the original buffer is tied to mupdf memory
