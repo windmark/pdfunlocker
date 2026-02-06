@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   FileText,
   Check,
@@ -5,15 +6,27 @@ import {
   AlertCircle,
   Lock,
   Download,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type { PdfFile } from "@/types/pdf";
 
 interface FileRowProps {
   pdfFile: PdfFile;
   onDownload: (id: string) => void;
+  showIndividualPassword?: boolean;
+  onUnlockWithPassword?: (id: string, password: string) => void;
 }
 
-export const FileRow = ({ pdfFile, onDownload }: FileRowProps) => {
+export const FileRow = ({
+  pdfFile,
+  onDownload,
+  showIndividualPassword,
+  onUnlockWithPassword,
+}: FileRowProps) => {
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const statusIcon = () => {
     switch (pdfFile.status) {
       case "queued":
@@ -29,19 +42,16 @@ export const FileRow = ({ pdfFile, onDownload }: FileRowProps) => {
   };
 
   return (
-    <div className="rounded-xl bg-secondary p-3 animate-fade-in">
+    <div className="rounded-xl bg-secondary p-3 animate-fade-in space-y-2">
       <div className="flex items-center gap-3">
-        {/* Status icon */}
         <div className="flex-shrink-0 w-6 flex items-center justify-center">
           {statusIcon()}
         </div>
 
-        {/* File icon */}
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-background flex-shrink-0">
           <FileText className="w-5 h-5 text-muted-foreground" />
         </div>
 
-        {/* File info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{pdfFile.file.name}</p>
           <p className="text-xs text-muted-foreground">
@@ -63,7 +73,6 @@ export const FileRow = ({ pdfFile, onDownload }: FileRowProps) => {
           </p>
         </div>
 
-        {/* Download button for unlocked */}
         {pdfFile.status === "unlocked" && (
           <button
             onClick={() => onDownload(pdfFile.id)}
@@ -74,6 +83,54 @@ export const FileRow = ({ pdfFile, onDownload }: FileRowProps) => {
           </button>
         )}
       </div>
+
+      {/* Individual password input */}
+      {showIndividualPassword &&
+        pdfFile.status === "needs-password" &&
+        onUnlockWithPassword && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (password) onUnlockWithPassword(pdfFile.id, password);
+            }}
+            className="flex gap-2 ml-9"
+          >
+            <div className="relative flex-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full px-3 py-1.5 pr-9 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+            <button
+              type="submit"
+              disabled={!password}
+              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Unlock
+            </button>
+          </form>
+        )}
+
+      {/* Show error for individual password mode */}
+      {showIndividualPassword &&
+        pdfFile.status === "needs-password" &&
+        pdfFile.errorMessage && (
+          <p className="text-xs text-destructive ml-9">{pdfFile.errorMessage}</p>
+        )}
     </div>
   );
 };

@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef } from "react";
-import { Lock, Unlock, Download, Plus, Loader2, Eye, EyeOff } from "lucide-react";
+import { Lock, Unlock, Download, Plus, Loader2, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { useMupdfWorker } from "@/hooks/useMupdfWorker";
 import { DropZone } from "@/components/DropZone";
 import { FileRow } from "@/components/FileRow";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PdfFile } from "@/types/pdf";
 
 export const PDFUnlocker = () => {
@@ -11,6 +13,7 @@ export const PDFUnlocker = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [sharedPassword, setSharedPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [useSharedPassword, setUseSharedPassword] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { autoUnlock, decrypt, isReady } = useMupdfWorker();
@@ -103,19 +106,17 @@ export const PDFUnlocker = () => {
     [addFiles]
   );
 
-  const handleUnlockWithPassword = useCallback(async () => {
+  const handleUnlockWithSharedPassword = useCallback(async () => {
     if (!sharedPassword) return;
 
     const needsPassword = files.filter((f) => f.status === "needs-password");
 
-    // Set all to processing
     setFiles((prev) =>
       prev.map((f) =>
         f.status === "needs-password" ? { ...f, status: "processing" } : f
       )
     );
 
-    // Decrypt each file with the shared password
     for (const pdfFile of needsPassword) {
       const result = await decrypt(pdfFile.file, sharedPassword);
 
@@ -145,6 +146,46 @@ export const PDFUnlocker = () => {
     }
   }, [files, sharedPassword, decrypt]);
 
+  const handleUnlockIndividual = useCallback(
+    async (id: string, password: string) => {
+      const pdfFile = files.find((f) => f.id === id);
+      if (!pdfFile) return;
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id ? { ...f, status: "processing" } : f
+        )
+      );
+
+      const result = await decrypt(pdfFile.file, password);
+
+      if (result.success && result.data) {
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === id
+              ? { ...f, status: "unlocked", unlockedData: result.data, errorMessage: undefined }
+              : f
+          )
+        );
+      } else {
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  status: "needs-password",
+                  errorMessage: result.error?.includes("password")
+                    ? "Incorrect password"
+                    : result.error,
+                }
+              : f
+          )
+        );
+      }
+    },
+    [files, decrypt]
+  );
+
   const downloadFile = (pdfFile: PdfFile) => {
     if (!pdfFile.unlockedData) return;
     const blob = new Blob([pdfFile.unlockedData.buffer as ArrayBuffer], { type: "application/pdf" });
@@ -168,10 +209,32 @@ export const PDFUnlocker = () => {
 
   const handleDownloadAll = useCallback(() => {
     const unlocked = files.filter((f) => f.status === "unlocked" && f.unlockedData);
-    // Stagger downloads to avoid browser throttling
     unlocked.forEach((f, i) => {
       setTimeout(() => downloadFile(f), i * 150);
     });
+  }, [files]);
+
+  const handleDownloadZip = useCallback(async () => {
+    const unlocked = files.filter((f) => f.status === "unlocked" && f.unlockedData);
+    if (unlocked.length === 0) return;
+
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+
+    unlocked.forEach((f) => {
+      const name = f.file.name.replace(".pdf", "_unlocked.pdf");
+      zip.file(name, f.unlockedData!);
+    });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "unlocked_pdfs.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [files]);
 
   const handleReset = () => {
@@ -210,7 +273,6 @@ export const PDFUnlocker = () => {
           </p>
         </div>
 
-        {/* Drop Zone - always visible when no files */}
         {files.length === 0 ? (
           <DropZone
             isDragging={isDragging}
@@ -241,55 +303,78 @@ export const PDFUnlocker = () => {
                   key={pdfFile.id}
                   pdfFile={pdfFile}
                   onDownload={handleDownloadSingle}
+                  showIndividualPassword={!useSharedPassword}
+                  onUnlockWithPassword={handleUnlockIndividual}
                 />
               ))}
             </div>
 
-            {/* Shared password input for files that need it */}
+            {/* Password section */}
             {needsPasswordFiles.length > 0 && !isProcessing && (
               <div className="rounded-xl bg-secondary p-4 space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  <Lock className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-                  {needsPasswordFiles.length === 1
-                    ? "1 file requires a password"
-                    : `${needsPasswordFiles.length} files require a password`}
-                </p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleUnlockWithPassword();
-                  }}
-                  className="flex gap-2"
-                >
-                  <div className="relative flex-1">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={sharedPassword}
-                      onChange={(e) => setSharedPassword(e.target.value)}
-                      placeholder="Enter password for all files"
-                      className="w-full px-3 py-2 pr-9 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={!sharedPassword}
-                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                {/* Toggle */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    <Lock className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                    {needsPasswordFiles.length === 1
+                      ? "1 file requires a password"
+                      : `${needsPasswordFiles.length} files require a password`}
+                  </p>
+                  {needsPasswordFiles.length > 1 && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <span>Same for all</span>
+                      <Switch
+                        checked={useSharedPassword}
+                        onCheckedChange={setUseSharedPassword}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Shared password input */}
+                {useSharedPassword && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleUnlockWithSharedPassword();
+                    }}
+                    className="flex gap-2"
                   >
-                    Unlock
-                  </button>
-                </form>
-                {needsPasswordFiles.some((f) => f.errorMessage) && (
+                    <div className="relative flex-1">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={sharedPassword}
+                        onChange={(e) => setSharedPassword(e.target.value)}
+                        placeholder={
+                          needsPasswordFiles.length === 1
+                            ? "Enter password"
+                            : "Enter password for all files"
+                        }
+                        className="w-full px-3 py-2 pr-9 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!sharedPassword}
+                      className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      Unlock
+                    </button>
+                  </form>
+                )}
+
+                {useSharedPassword && needsPasswordFiles.some((f) => f.errorMessage) && (
                   <p className="text-xs text-destructive">
                     {needsPasswordFiles.find((f) => f.errorMessage)?.errorMessage}
                   </p>
@@ -299,7 +384,6 @@ export const PDFUnlocker = () => {
 
             {/* Actions bar */}
             <div className="flex items-center gap-2 pt-2">
-              {/* Add more files */}
               <label className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 cursor-pointer transition-all">
                 <input
                   type="file"
@@ -315,15 +399,38 @@ export const PDFUnlocker = () => {
 
               <div className="flex-1" />
 
-              {/* Download all */}
+              {/* Download with dropdown */}
               {unlockedFiles.length > 1 && (
-                <button
-                  onClick={handleDownloadAll}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all"
-                >
-                  <Download className="w-4 h-4" />
-                  Download all ({unlockedFiles.length})
-                </button>
+                <div className="flex items-center">
+                  <button
+                    onClick={handleDownloadAll}
+                    className="flex items-center gap-2 px-4 py-3 rounded-l-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download all ({unlockedFiles.length})
+                  </button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="px-2 py-3 rounded-r-xl bg-primary text-primary-foreground border-l border-primary-foreground/20 hover:opacity-90 transition-all">
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-44 p-1">
+                      <button
+                        onClick={handleDownloadAll}
+                        className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-secondary transition-colors"
+                      >
+                        Individual files
+                      </button>
+                      <button
+                        onClick={handleDownloadZip}
+                        className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-secondary transition-colors"
+                      >
+                        Download as ZIP
+                      </button>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               )}
             </div>
 
