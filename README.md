@@ -58,16 +58,10 @@ npm run dev
 npm run build
 ```
 
-## License
-
-MIT
-
 ---
 
 <div align="center">
 
 ### ✨ Built entirely with [Lovable](https://lovable.dev) ✨
-
-*This project was created 100% through AI-assisted development using Lovable — from concept to deployment, without writing a single line of code manually.*
 
 </div>
