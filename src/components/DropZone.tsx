@@ -48,7 +48,7 @@ export const DropZone = ({
           Drop your PDFs here
         </p>
         <p className="text-sm text-muted-foreground">
-          or click to browse • multiple files supported
+          or click to browse • files and folders supported
         </p>
       </div>
     </label>
