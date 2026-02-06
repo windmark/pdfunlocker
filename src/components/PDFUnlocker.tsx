@@ -359,7 +359,7 @@ export const PDFUnlocker = () => {
                         data-1p-ignore
                         data-lpignore="true"
                         data-form-type="other"
-                        className="w-full px-3 py-2 pr-9 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                        className="w-full px-3 py-2 pr-9 rounded-lg bg-background border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                       />
                       <button
                         type="button"
