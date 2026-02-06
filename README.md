@@ -15,7 +15,27 @@ A privacy-focused web tool to remove password protection from PDF files. All pro
 2. Enter the document password
 3. Download the unlocked PDF
 
-The app uses [MuPDF](https://mupdf.com/) compiled to WebAssembly, running in a Web Worker for non-blocking performance.
+### Architecture
+
+PDF decryption is computationally intensive and would freeze the browser if run on the main thread. To solve this, the app uses a **Web Worker architecture**:
+
+```
+Main Thread (UI)          Web Worker (Background)
+     │                           │
+     │── Upload PDF + Password ──▶│
+     │                           │── Load MuPDF WASM
+     │                           │── Authenticate password
+     │                           │── Decrypt & rebuild PDF
+     │◀── Unlocked PDF bytes ────│
+     │
+     ▼
+  Download
+```
+
+- **[MuPDF](https://mupdf.com/)** is compiled to WebAssembly, enabling native-quality PDF processing in the browser
+- The **Web Worker** runs MuPDF in a separate thread, keeping the UI responsive during decryption
+- A custom **React hook** (`useMupdfWorker`) manages worker lifecycle and message passing
+- Files are transferred as `ArrayBuffer` for zero-copy performance
 
 ## Tech Stack
 
