@@ -1,73 +1,47 @@
-# Welcome to your Lovable project
+# PDF Unlocker
 
-## Project info
+A privacy-focused web tool to remove password protection from PDF files. All processing happens locally in your browser—your files never leave your device.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- 🔓 **Native PDF Decryption** – Preserves original text, fonts, and document structure
+- 🔒 **100% Client-Side** – Files are processed entirely in your browser using WebAssembly
+- ⚡ **Fast & Lightweight** – No server uploads, no waiting
+- 📱 **Responsive Design** – Works on desktop and mobile
 
-There are several ways of editing your application.
+## How It Works
 
-**Use Lovable**
+1. Upload a password-protected PDF
+2. Enter the document password
+3. Download the unlocked PDF
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+The app uses [MuPDF](https://mupdf.com/) compiled to WebAssembly, running in a Web Worker for non-blocking performance.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Tech Stack
 
-**Use your preferred IDE**
+- **React 18** with TypeScript
+- **Vite** for fast development and builds
+- **Tailwind CSS** for styling
+- **MuPDF.js** for native PDF decryption via WebAssembly
+- **shadcn/ui** components
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Development
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Install dependencies
+npm install
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start dev server
 npm run dev
+
+# Build for production
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+## License
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+MIT
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Built with [Lovable](https://lovable.dev)
