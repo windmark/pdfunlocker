@@ -272,6 +272,7 @@ describe("useMupdfWorker", () => {
 
   describe("worker onerror", () => {
     it("resolves all pending promises with error on worker crash", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const { result } = renderHook(() => useMupdfWorker());
 
       act(() => {
@@ -293,6 +294,8 @@ describe("useMupdfWorker", () => {
       const res = await promise!;
       expect(res.success).toBe(false);
       expect(res.error).toBe("Worker encountered an error");
+      expect(consoleSpy).toHaveBeenCalledWith("MuPDF Worker error:", expect.any(ErrorEvent));
+      consoleSpy.mockRestore();
     });
   });
 
