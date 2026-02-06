@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { Lock, Unlock, Download, Plus, Loader2, Eye, EyeOff, ChevronDown } from "lucide-react";
+import { Lock, Unlock, Download, Plus, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { useMupdfWorker } from "@/hooks/useMupdfWorker";
 import { DropZone } from "@/components/DropZone";
 import { FileRow } from "@/components/FileRow";
@@ -16,7 +16,7 @@ export const PDFUnlocker = () => {
   const [useSharedPassword, setUseSharedPassword] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { autoUnlock, decrypt, isReady } = useMupdfWorker();
+  const { autoUnlock, decrypt } = useMupdfWorker();
 
   const processFile = useCallback(
     async (pdfFile: PdfFile) => {
@@ -70,11 +70,9 @@ export const PDFUnlocker = () => {
 
       setFiles((prev) => [...prev, ...pdfFiles]);
 
-      if (isReady) {
-        pdfFiles.forEach((pf) => processFile(pf));
-      }
+      pdfFiles.forEach((pf) => processFile(pf));
     },
-    [isReady, processFile]
+    [processFile]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -453,13 +451,6 @@ export const PDFUnlocker = () => {
           </div>
         )}
 
-        {/* Worker loading state */}
-        {!isReady && files.length === 0 && (
-          <div className="flex items-center justify-center gap-2 mt-4 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading PDF processor…
-          </div>
-        )}
 
         {/* Footer */}
         <div className="flex flex-col items-center gap-3 mt-12">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface DecryptResult {
   success: boolean;
@@ -7,11 +7,18 @@ interface DecryptResult {
   error?: string;
 }
 
+interface QueuedMessage {
+  message: any;
+  transfer: Transferable[];
+  id: number;
+}
+
 export function useMupdfWorker() {
   const workerRef = useRef<Worker | null>(null);
   const pendingRef = useRef<Map<number, (result: DecryptResult) => void>>(new Map());
   const idRef = useRef(0);
-  const [isReady, setIsReady] = useState(false);
+  const readyRef = useRef(false);
+  const queueRef = useRef<QueuedMessage[]>([]);
 
   useEffect(() => {
     const worker = new Worker(
@@ -23,7 +30,12 @@ export function useMupdfWorker() {
       const { type, id, data, error } = event.data;
 
       if (type === "ready") {
-        setIsReady(true);
+        readyRef.current = true;
+        // Flush queued messages
+        for (const queued of queueRef.current) {
+          worker.postMessage(queued.message, queued.transfer);
+        }
+        queueRef.current = [];
         return;
       }
 
@@ -54,7 +66,18 @@ export function useMupdfWorker() {
       worker.terminate();
       workerRef.current = null;
       pendingRef.current.clear();
+      readyRef.current = false;
+      queueRef.current = [];
     };
+  }, []);
+
+  const sendMessage = useCallback((message: any, transfer: Transferable[], id: number) => {
+    if (!workerRef.current) return;
+    if (readyRef.current) {
+      workerRef.current.postMessage(message, transfer);
+    } else {
+      queueRef.current.push({ message, transfer, id });
+    }
   }, []);
 
   const autoUnlock = useCallback(
@@ -66,13 +89,14 @@ export function useMupdfWorker() {
       const id = idRef.current++;
       return new Promise((resolve) => {
         pendingRef.current.set(id, resolve);
-        workerRef.current!.postMessage(
+        sendMessage(
           { type: "auto-unlock", id, data: arrayBuffer },
-          [arrayBuffer]
+          [arrayBuffer],
+          id
         );
       });
     },
-    []
+    [sendMessage]
   );
 
   const decrypt = useCallback(
@@ -84,14 +108,15 @@ export function useMupdfWorker() {
       const id = idRef.current++;
       return new Promise((resolve) => {
         pendingRef.current.set(id, resolve);
-        workerRef.current!.postMessage(
+        sendMessage(
           { type: "decrypt", id, data: arrayBuffer, password },
-          [arrayBuffer]
+          [arrayBuffer],
+          id
         );
       });
     },
-    []
+    [sendMessage]
   );
 
-  return { autoUnlock, decrypt, isReady };
+  return { autoUnlock, decrypt };
 }
