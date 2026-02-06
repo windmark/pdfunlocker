@@ -314,12 +314,17 @@ export const PDFUnlocker = () => {
               <div className="rounded-xl bg-secondary p-4 space-y-3">
                 {/* Toggle */}
                 <div className="flex items-center justify-between">
+                <div>
                   <p className="text-sm text-muted-foreground">
                     <Lock className="w-4 h-4 inline mr-1.5 -mt-0.5" />
                     {needsPasswordFiles.length === 1
                       ? "1 file requires a password"
                       : `${needsPasswordFiles.length} files require a password`}
                   </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1 ml-5.5">
+                    Some online tools bypass weak encryption server-side — this app processes everything locally for your privacy.
+                  </p>
+                </div>
                   {needsPasswordFiles.length > 1 && (
                     <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                       <span>Same for all</span>
