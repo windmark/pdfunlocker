@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Lock, Unlock, Upload, Download, Loader2, X, FileText } from "lucide-react";
+import { Lock, Unlock, Upload, Download, Loader2, X, FileText, Eye, EyeOff, Github } from "lucide-react";
 import { useMupdfWorker } from "@/hooks/useMupdfWorker";
 
 type Status = "idle" | "loading" | "unlocked" | "error";
@@ -11,6 +11,7 @@ export const PDFUnlocker = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [unlockedPdf, setUnlockedPdf] = useState<Uint8Array | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { decrypt, isReady } = useMupdfWorker();
 
@@ -179,18 +180,26 @@ export const PDFUnlocker = () => {
                 {/* Password Input */}
                 <div className="relative mb-4">
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter PDF password"
                     className={`
-                      w-full px-4 py-4 rounded-xl bg-secondary border-2
+                      w-full px-4 py-4 pr-12 rounded-xl bg-secondary border-2
                       text-foreground placeholder:text-muted-foreground
                       focus:outline-none focus:border-primary transition-colors
                       ${status === "error" ? "border-destructive" : "border-transparent"}
                     `}
                     onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
 
                 {/* Error Message */}
@@ -261,9 +270,20 @@ export const PDFUnlocker = () => {
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground mt-12">
-          Your files never leave your browser • Native PDF decryption
-        </p>
+        <div className="flex flex-col items-center gap-3 mt-12">
+          <p className="text-center text-xs text-muted-foreground">
+            Your files never leave your browser • Native PDF decryption
+          </p>
+          <a
+            href="https://github.com/nicholasxjy/pdfunlock"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="View on GitHub"
+          >
+            <Github className="w-5 h-5" />
+          </a>
+        </div>
       </div>
     </div>
   );
