@@ -86,10 +86,51 @@ export const PDFUnlocker = () => {
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      addFiles(Array.from(e.dataTransfer.files));
+
+      const items = Array.from(e.dataTransfer.items);
+      const entries = items
+        .map((item) => item.webkitGetAsEntry?.())
+        .filter(Boolean) as FileSystemEntry[];
+
+      if (entries.length > 0 && entries.some((entry) => entry.isDirectory)) {
+        const collectedFiles: File[] = [];
+
+        const readEntry = (entry: FileSystemEntry): Promise<void> => {
+          if (entry.isFile) {
+            return new Promise((resolve) => {
+              (entry as FileSystemFileEntry).file((file) => {
+                collectedFiles.push(file);
+                resolve();
+              });
+            });
+          }
+          if (entry.isDirectory) {
+            return new Promise((resolve) => {
+              const reader = (entry as FileSystemDirectoryEntry).createReader();
+              const readAll = (allEntries: FileSystemEntry[] = []) => {
+                reader.readEntries(async (batch) => {
+                  if (batch.length === 0) {
+                    await Promise.all(allEntries.map(readEntry));
+                    resolve();
+                  } else {
+                    readAll([...allEntries, ...batch]);
+                  }
+                });
+              };
+              readAll();
+            });
+          }
+          return Promise.resolve();
+        };
+
+        await Promise.all(entries.map(readEntry));
+        addFiles(collectedFiles);
+      } else {
+        addFiles(Array.from(e.dataTransfer.files));
+      }
     },
     [addFiles]
   );
