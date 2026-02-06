@@ -400,7 +400,7 @@ export const PDFUnlocker = () => {
               <div className="flex-1" />
 
               {/* Download with dropdown */}
-              {unlockedFiles.length > 1 && (
+              {unlockedFiles.length > 1 && unlockedFiles.length === totalFiles && (
                 <div className="flex items-center">
                   <button
                     onClick={handleDownloadAll}
@@ -411,7 +411,7 @@ export const PDFUnlocker = () => {
                   </button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="px-2 py-3 rounded-r-xl bg-primary text-primary-foreground border-l border-primary-foreground/20 hover:opacity-90 transition-all">
+                      <button className="flex items-center px-2 py-3 rounded-r-xl bg-primary text-primary-foreground border-l border-primary-foreground/20 hover:opacity-90 transition-all">
                         <ChevronDown className="w-4 h-4" />
                       </button>
                     </PopoverTrigger>
