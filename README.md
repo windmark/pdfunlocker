@@ -64,4 +64,10 @@ MIT
 
 ---
 
-Built with [Lovable](https://lovable.dev)
+<div align="center">
+
+### ✨ Built entirely with [Lovable](https://lovable.dev) ✨
+
+*This project was created 100% through AI-assisted development using Lovable — from concept to deployment, without writing a single line of code manually.*
+
+</div>
