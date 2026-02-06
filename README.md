@@ -56,8 +56,8 @@ npm run build
 ## Self-Hosting with Docker
 
 ```bash
-docker pull ghcr.io/windmark/pdfunlocker:6e559be
-docker run -d -p 8080:80 ghcr.io/windmark/pdfunlocker:6e559be
+docker pull ghcr.io/windmark/pdfunlocker:6f93447
+docker run -d -p 8080:80 ghcr.io/windmark/pdfunlocker:6f93447
 ```
 
 The app will be available at `http://localhost:8080`.
