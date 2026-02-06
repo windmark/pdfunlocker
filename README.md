@@ -55,34 +55,12 @@ npm run build
 
 ## Self-Hosting with Docker
 
-The app is published as a Docker image on every push to `main`. Pull the latest image from the GitHub Container Registry:
-
 ```bash
-docker pull ghcr.io/windmark/pdfunlocker:latest
-```
-
-Or pin to a specific commit:
-
-```bash
-docker pull ghcr.io/windmark/pdfunlocker:<commit-sha>
-```
-
-Run it:
-
-```bash
-docker run -d -p 8080:80 ghcr.io/windmark/pdfunlocker:latest
+docker pull ghcr.io/windmark/pdfunlocker:0000000
+docker run -d -p 8080:80 ghcr.io/windmark/pdfunlocker:0000000
 ```
 
 The app will be available at `http://localhost:8080`.
-
-You can also build locally:
-
-```bash
-docker build -t pdfunlocker .
-docker run -d -p 8080:80 pdfunlocker
-```
-
-> **Latest image:** [`ghcr.io/windmark/pdfunlocker:latest`](https://github.com/windmark/pdfunlocker/pkgs/container/pdfunlocker)
 
 ---
 
