@@ -341,7 +341,7 @@ export const PDFUnlocker = () => {
                     className="flex gap-2"
                   >
                     <div className="relative flex-1">
-                      <input
+                    <input
                         type={showPassword ? "text" : "password"}
                         value={sharedPassword}
                         onChange={(e) => setSharedPassword(e.target.value)}
@@ -350,6 +350,10 @@ export const PDFUnlocker = () => {
                             ? "Enter password"
                             : "Enter password for all files"
                         }
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
+                        data-form-type="other"
                         className="w-full px-3 py-2 pr-9 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                       />
                       <button
